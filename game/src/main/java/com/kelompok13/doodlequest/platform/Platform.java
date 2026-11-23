@@ -1,19 +1,23 @@
 
 package com.kelompok13.doodlequest.platform;
 
+import com.kelompok13.doodlequest.common.Constants;
 import com.kelompok13.doodlequest.common.GameObject;
 import com.kelompok13.doodlequest.player.Player;
 
+// Class dasar yang menjadi induk semua jenis platform.
 public abstract class Platform extends GameObject {
-    protected boolean active = true;
 
+    // Constructor untuk menentukan posisi dan ukuran platform.
     protected Platform(double x, double y) {
-        super(x, y, 180, 24);
+        super(
+                x,
+                y,
+                Constants.PLATFORM_WIDTH,
+                Constants.PLATFORM_HEIGHT
+        );
     }
 
+    // Efek yang dijalankan ketika player berhasil mendarat.
     public abstract void onLanded(Player player);
-
-    public boolean isActive() {
-        return active;
-    }
 }

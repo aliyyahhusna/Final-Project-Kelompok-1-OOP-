@@ -4,56 +4,86 @@ package com.kelompok13.doodlequest.platform;
 import com.kelompok13.doodlequest.common.Constants;
 import com.kelompok13.doodlequest.player.Player;
 import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.paint.Color;
+import javafx.scene.image.Image;
 
 public class MovingPlatform extends Platform {
 
-    private static final double SPEED = 100;
-    private static final double MOVE_RANGE = 100;
+    // Gambar khusus untuk platform yang bergerak.
+    private static final Image PLATFORM_IMAGE = loadImage();
 
-    private final double minX;
-    private final double maxX;
+    // Kecepatan dan jarak gerak platform.
+    private static final double MOVE_SPEED = 90;
+    private static final double MOVE_DISTANCE = 120;
+
+    private final double startX;
     private int direction = 1;
 
     public MovingPlatform(double x, double y) {
         super(x, y);
 
-        minX = Math.max(0, x - MOVE_RANGE);
-        maxX = Math.min(Constants.WIDTH - width, x + MOVE_RANGE);
+        // Posisi awal digunakan sebagai batas gerakan platform.
+        this.startX = x;
     }
 
+    // Mengambil gambar moving platform dari folder assets.
+    private static Image loadImage() {
+        var imageStream = MovingPlatform.class.getResourceAsStream(
+                "/images/platforms/moving_platform.png"
+        );
+
+        if (imageStream == null) {
+            return null;
+        }
+
+        return new Image(imageStream);
+    }
+
+    // Menggerakkan platform ke kiri dan kanan.
     @Override
     public void update(double dt) {
         if (!active) {
             return;
         }
 
-        x += direction * SPEED * dt;
+        x += MOVE_SPEED * direction * dt;
 
-        if (x >= maxX) {
-            x = maxX;
+        // Kalau sudah mencapai batas kanan, platform berbalik arah.
+        if (x >= startX + MOVE_DISTANCE) {
+            x = startX + MOVE_DISTANCE;
             direction = -1;
-        } else if (x <= minX) {
-            x = minX;
+        }
+
+        // Kalau sudah mencapai batas kiri, platform bergerak ke kanan lagi.
+        if (x <= startX - MOVE_DISTANCE) {
+            x = startX - MOVE_DISTANCE;
             direction = 1;
+        }
+
+        // Menjaga agar platform tidak keluar dari area permainan.
+        if (x < 0) {
+            x = 0;
+            direction = 1;
+        }
+
+        if (x + width > Constants.WIDTH) {
+            x = Constants.WIDTH - width;
+            direction = -1;
         }
     }
 
+    // Menampilkan gambar platform pada posisi terbarunya.
     @Override
     public void draw(GraphicsContext gc) {
-        if (!active) {
+        if (!active || PLATFORM_IMAGE == null) {
             return;
         }
 
-        gc.setFill(Color.DODGERBLUE);
-        gc.fillRoundRect(x, y, width, height, 12, 12);
+        gc.drawImage(PLATFORM_IMAGE, x, y, width, height);
     }
 
+    // Tidak ada efek khusus ketika player mendarat.
     @Override
     public void onLanded(Player player) {
-        if (active) {
-            // TODO: Aktifkan player.bounce()
-            // setelah Player dari Zefran siap.
-        }
+        // Player tetap menggunakan mekanisme pantulan normal.
     }
 }
