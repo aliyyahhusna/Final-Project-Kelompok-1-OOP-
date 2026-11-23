@@ -8,7 +8,7 @@ public abstract class Platform extends GameObject {
     protected boolean active = true;
 
     protected Platform(double x, double y) {
-        super(x, y, 80, 14);
+        super(x, y, 180, 24);
     }
 
     public abstract void onLanded(Player player);
