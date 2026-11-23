@@ -1,12 +1,15 @@
 package com.kelompok13.doodlequest.state;
 
 import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.input.KeyEvent;
+import javafx.scene.input.KeyCode;
 
-public interface GameState {
-    void enter();
-    void update(double dt);
-    void draw(GraphicsContext gc);
-    void handleKey(KeyEvent event, boolean pressed);
-    void exit();
+public abstract class GameState {
+    protected final StateManager manager;
+    protected GameState(StateManager manager) { this.manager=manager; }
+    public void onEnter() {}
+    public void onExit() {}
+    public abstract void update(double dt);
+    public abstract void draw(GraphicsContext gc);
+    public void onKeyPressed(KeyCode key) {}
+    public void onKeyReleased(KeyCode key) {}
 }
