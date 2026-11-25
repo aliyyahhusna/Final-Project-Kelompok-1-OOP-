@@ -79,16 +79,16 @@ public class CollisionSystem {
 
             Rectangle2D bounds = enemy.getBounds();
 
-            if (isLandingOn(player, bounds)) {
+            boolean touching = isLandingOn(player, bounds)
+                    || player.getBounds().intersects(bounds);
+
+            if (touching && player.takeHit()) {
+                game.loseLife();
                 enemy.defeat();
-                player.landOn(bounds.getMinY());
-                player.bounce();
-                game.addScore(STOMP_SCORE);
-            } else if (player.getBounds().intersects(bounds)) {
-                damage(player);
             }
         }
     }
+
 
     /** Peluru yang mengenai pemain selalu dikembalikan ke pool. */
     public void checkProjectiles(Player player, ProjectilePool pool) {

@@ -38,6 +38,8 @@ public final class PlayingState extends GameState {
     private final LevelGenerator generator = new LevelGenerator();
     private final List<Platform> platforms = new ArrayList<>();
     private final List<Enemy> enemies = new ArrayList<>();
+    private double nextEnemyY;
+    private int spawnedEnemyCount;
 
     // Menggunakan player dan collision system yang sudah tersedia.
     private final Player player = new Player(580, 500);
@@ -50,6 +52,7 @@ public final class PlayingState extends GameState {
     private double levelStartY = 500;
     private double highestWorldY = 500;
     private double previousLevelHeight = 0;
+
 
     private int scoredSteps = 0;
 
@@ -74,6 +77,8 @@ public final class PlayingState extends GameState {
         camera.reset();
         platforms.clear();
         enemies.clear();
+        nextEnemyY = 100;
+        spawnedEnemyCount = 0;
 
         if (game.getLevel() == 1) {
             enemies.add(EnemyFactory.createEnemy(
@@ -168,10 +173,46 @@ public final class PlayingState extends GameState {
 
         // Mengecek apakah player mendarat pada platform.
         collision.checkPlatforms(player, platforms);
+        int livesBeforeEnemy = game.getLives();
         collision.checkEnemies(player, enemies);
+        if (game.getLives() < livesBeforeEnemy) {
+
+            if (game.getLives() <= 0) {
+                manager.change(new GameOverState(manager));
+                return;
+            }
+            respawnPlayer();
+            return;
+        }
 
         // Kamera mengikuti posisi player saat bergerak ke atas.
         camera.follow(player.getY());
+        if (game.getLevel() == 1) {
+
+            int defeatedCount = 0;
+
+            for (Enemy enemy : enemies) {
+                if (!enemy.isActive()) {
+                    defeatedCount++;
+                }
+            }
+
+            enemies.removeIf(enemy ->
+                    !enemy.isActive()
+                            || enemy.getY() >
+                            camera.getY() + Constants.HEIGHT + 200
+            );
+
+            // Mengganti Enemy yang hilang
+            for (int i = 0; i < defeatedCount; i++) {
+                spawnNextEnemy();
+            }
+
+            // Memunculkan Enemy baru saat kamera naik
+            while (nextEnemyY > camera.getY() - 350) {
+                spawnNextEnemy();
+            }
+        }
 
         // Menyimpan posisi tertinggi yang sudah dicapai player.
         highestWorldY = Math.min(
@@ -246,7 +287,32 @@ public final class PlayingState extends GameState {
             bossZone = true;
         }
     }
+    // Membuat Enemy baru di ketinggian berikutnya.
+    private void spawnNextEnemy() {
 
+        if (game.getLevel() != 1) {
+            return;
+        }
+
+        // Jenis musuh muncul bergantian.
+        EnemyType type = spawnedEnemyCount % 2 == 0
+                ? EnemyType.STATIONARY
+                : EnemyType.MOVING;
+
+        // Posisi horizontal bergantian.
+        double x = spawnedEnemyCount % 2 == 0
+                ? 280
+                : 850;
+
+        enemies.add(
+                EnemyFactory.createEnemy(type, x, nextEnemyY)
+        );
+
+        // Musuh berikutnya muncul 320 unit lebih tinggi.
+        nextEnemyY -= 320;
+
+        spawnedEnemyCount++;
+    }
     // Membuat platform tambahan di atas platform terakhir.
     private void extendPlatforms() {
 
