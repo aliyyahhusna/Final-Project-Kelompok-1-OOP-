@@ -15,4 +15,9 @@ public final class StateManager {
     public void draw(GraphicsContext gc) {if(current!=null) current.draw(gc);}
     public void onKeyPressed(KeyCode k) {if(current!=null) current.onKeyPressed(k);}
     public void onKeyReleased(KeyCode k) {if(current!=null) current.onKeyReleased(k);}
+    public void onKeyTyped(String character) {
+        if (current != null) {
+            current.onKeyTyped(character);
+        }
+    }
 }

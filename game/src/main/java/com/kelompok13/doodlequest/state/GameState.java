@@ -12,4 +12,5 @@ public abstract class GameState {
     public abstract void draw(GraphicsContext gc);
     public void onKeyPressed(KeyCode key) {}
     public void onKeyReleased(KeyCode key) {}
+    public void onKeyTyped(String character) {}
 }
