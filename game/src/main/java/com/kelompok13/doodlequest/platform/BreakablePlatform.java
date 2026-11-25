@@ -43,13 +43,16 @@ public class BreakablePlatform extends Platform {
         gc.drawImage(PLATFORM_IMAGE, x, y, width, height);
     }
 
-    // Platform akan hancur setelah player berhasil mendarat.
+
     @Override
     public void onLanded(Player player) {
         if (!active) {
             return;
         }
 
+        // Player memantul sebelum platform dihancurkan.
+        player.bounce();
         active = false;
     }
+
 }

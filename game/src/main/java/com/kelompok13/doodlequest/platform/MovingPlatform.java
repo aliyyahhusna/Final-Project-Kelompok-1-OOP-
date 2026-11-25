@@ -81,9 +81,11 @@ public class MovingPlatform extends Platform {
         gc.drawImage(PLATFORM_IMAGE, x, y, width, height);
     }
 
-    // Tidak ada efek khusus ketika player mendarat.
+
     @Override
     public void onLanded(Player player) {
-        // Player tetap menggunakan mekanisme pantulan normal.
+        // Player tetap memantul meskipun platform bergerak.
+        player.bounce();
     }
+
 }
