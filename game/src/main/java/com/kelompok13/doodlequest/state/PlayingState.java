@@ -13,6 +13,9 @@ import com.kelompok13.doodlequest.player.CollisionSystem;
 import com.kelompok13.doodlequest.player.Player;
 import com.kelompok13.doodlequest.ui.Hud;
 import com.kelompok13.doodlequest.ui.ParallaxBackground;
+import com.kelompok13.doodlequest.enemy.Enemy;
+import com.kelompok13.doodlequest.enemy.EnemyFactory;
+import com.kelompok13.doodlequest.enemy.EnemyType;
 
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.input.KeyCode;
@@ -34,6 +37,7 @@ public final class PlayingState extends GameState {
     // Menghubungkan generator dengan daftar platform di gameplay.
     private final LevelGenerator generator = new LevelGenerator();
     private final List<Platform> platforms = new ArrayList<>();
+    private final List<Enemy> enemies = new ArrayList<>();
 
     // Menggunakan player dan collision system yang sudah tersedia.
     private final Player player = new Player(580, 500);
@@ -69,6 +73,17 @@ public final class PlayingState extends GameState {
 
         camera.reset();
         platforms.clear();
+        enemies.clear();
+
+        if (game.getLevel() == 1) {
+            enemies.add(EnemyFactory.createEnemy(
+                    EnemyType.STATIONARY, 280, 420
+            ));
+
+            enemies.add(EnemyFactory.createEnemy(
+                    EnemyType.MOVING, 850, 390
+            ));
+        }
 
         levelConfig = LevelConfig.getConfig(game.getLevel());
 
@@ -147,9 +162,13 @@ public final class PlayingState extends GameState {
         for (Platform platform : platforms) {
             platform.update(dt);
         }
+        for (Enemy enemy : enemies) {
+            enemy.update(dt);
+        }
 
         // Mengecek apakah player mendarat pada platform.
         collision.checkPlatforms(player, platforms);
+        collision.checkEnemies(player, enemies);
 
         // Kamera mengikuti posisi player saat bergerak ke atas.
         camera.follow(player.getY());
@@ -383,6 +402,11 @@ public final class PlayingState extends GameState {
             platform.draw(gc);
         }
 
+        for (Enemy enemy : enemies) {
+            if (enemy.isActive()) {
+                enemy.draw(gc);
+            }
+        }
         // Player digambar sesuai posisi di dunia permainan.
         player.draw(gc);
 
