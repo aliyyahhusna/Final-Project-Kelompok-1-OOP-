@@ -41,9 +41,11 @@ public class NormalPlatform extends Platform {
         }
     }
 
-    // Tidak ada efek tambahan ketika player mendarat.
+
     @Override
     public void onLanded(Player player) {
-        // Player tetap menggunakan mekanisme pantulan normal.
+        // Player memantul kembali setelah mendarat.
+        player.bounce();
     }
+
 }

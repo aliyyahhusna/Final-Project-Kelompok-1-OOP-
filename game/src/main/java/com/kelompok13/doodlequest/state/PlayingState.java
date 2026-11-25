@@ -4,6 +4,13 @@ package com.kelompok13.doodlequest.state;
 import com.kelompok13.doodlequest.common.Constants;
 import com.kelompok13.doodlequest.core.Camera2D;
 import com.kelompok13.doodlequest.core.GameManager;
+import com.kelompok13.doodlequest.platform.LevelConfig;
+import com.kelompok13.doodlequest.platform.LevelGenerator;
+import com.kelompok13.doodlequest.platform.Platform;
+import com.kelompok13.doodlequest.platform.PlatformFactory;
+import com.kelompok13.doodlequest.platform.PlatformType;
+import com.kelompok13.doodlequest.player.CollisionSystem;
+import com.kelompok13.doodlequest.player.Player;
 import com.kelompok13.doodlequest.ui.Hud;
 import com.kelompok13.doodlequest.ui.ParallaxBackground;
 
@@ -12,38 +19,87 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public final class PlayingState extends GameState {
 
     private final GameManager game = GameManager.getInstance();
-
     private final Hud hud = new Hud();
+    private final Camera2D camera = new Camera2D();
 
     private final ParallaxBackground level1Background =
             new ParallaxBackground();
 
-    private final Camera2D camera = new Camera2D();
+    // Menghubungkan generator dengan daftar platform di gameplay.
+    private final LevelGenerator generator = new LevelGenerator();
+    private final List<Platform> platforms = new ArrayList<>();
+
+    // Menggunakan player dan collision system yang sudah tersedia.
+    private final Player player = new Player(580, 500);
+    private final CollisionSystem collision = new CollisionSystem();
+
+    private LevelConfig levelConfig;
+    private double lastPlatformY;
 
     private double heightThisLevel = 0;
-    private double playerWorldY = 490;
-    private double levelStartY = 490;
-    private double highestWorldY = 490;
+    private double levelStartY = 500;
+    private double highestWorldY = 500;
+    private double previousLevelHeight = 0;
+
+    private int scoredSteps = 0;
 
     private boolean transitioning = false;
     private boolean bossZone = false;
     private double transitionSeconds = 0;
     private int nextLevel = 1;
 
-    private boolean left = false;
-    private boolean right = false;
-    private double playerX = 580;
-
     public PlayingState(StateManager manager, boolean restart) {
         super(manager);
 
         if (restart) {
             game.reset();
-            camera.reset();
         }
+
+        setupLevel();
+    }
+
+    // Menyiapkan posisi player dan platform untuk level aktif.
+    private void setupLevel() {
+
+        camera.reset();
+        platforms.clear();
+
+        levelConfig = LevelConfig.getConfig(game.getLevel());
+
+        // Menyiapkan pijakan aman untuk awal permainan.
+        Platform startingPlatform = PlatformFactory.create(
+                PlatformType.NORMAL,
+                580,
+                580
+        );
+
+        platforms.add(startingPlatform);
+
+        // Membuat platform awal di atas pijakan pertama.
+        List<Platform> initialPlatforms =
+                generator.generate(levelConfig, 480, 12);
+
+        platforms.addAll(initialPlatforms);
+
+        // Menyimpan posisi platform paling atas yang sudah dibuat.
+        lastPlatformY = 480 -
+                (11 * levelConfig.getVerticalSpacing());
+
+        // Player ditempatkan tepat di atas platform awal.
+        player.spawnAt(580, 580);
+        player.bounce();
+
+        levelStartY = player.getY();
+        highestWorldY = levelStartY;
+        heightThisLevel = 0;
+        scoredSteps = 0;
+        bossZone = false;
     }
 
     @Override
@@ -66,6 +122,7 @@ public final class PlayingState extends GameState {
     @Override
     public void update(double dt) {
 
+        // Menghentikan gameplay sementara selama pergantian level.
         if (transitioning) {
 
             transitionSeconds -= dt;
@@ -73,62 +130,147 @@ public final class PlayingState extends GameState {
             if (transitionSeconds <= 0) {
 
                 transitioning = false;
+
+                previousLevelHeight += heightThisLevel;
                 game.setLevel(nextLevel);
 
-                playerWorldY = 490;
-                levelStartY = 490;
-                highestWorldY = 490;
-                heightThisLevel = 0;
-
-                camera.reset();
-
-                playerX = 580;
-                bossZone = false;
-
-                left = false;
-                right = false;
+                setupLevel();
             }
 
             return;
         }
 
-        if (left) {
-            playerX -= 360 * dt;
+        // Memperbarui gerakan player.
+        player.update(dt);
+
+        // Memperbarui semua platform, termasuk moving platform.
+        for (Platform platform : platforms) {
+            platform.update(dt);
         }
 
-        if (right) {
-            playerX += 360 * dt;
-        }
+        // Mengecek apakah player mendarat pada platform.
+        collision.checkPlatforms(player, platforms);
 
-        playerX = Math.max(
-                0,
-                Math.min(
-                        Constants.WIDTH - Constants.PLAYER_SIZE,
-                        playerX
-                )
+        // Kamera mengikuti posisi player saat bergerak ke atas.
+        camera.follow(player.getY());
+
+        // Menyimpan posisi tertinggi yang sudah dicapai player.
+        highestWorldY = Math.min(
+                highestWorldY,
+                player.getY()
         );
 
-        if (game.getLevel() == 1 &&
-                heightThisLevel >= Constants.LEVEL_1_HEIGHT) {
+        heightThisLevel = Math.max(
+                0,
+                levelStartY - highestWorldY
+        );
 
-            startTransition(2);
+        // Tinggi total tetap dihitung dari level sebelumnya.
+        game.setMaxHeight(
+                previousLevelHeight + heightThisLevel
+        );
 
-        } else if (game.getLevel() == 2 &&
-                heightThisLevel >= Constants.LEVEL_2_HEIGHT) {
+        // Skor bertambah setiap kenaikan 100 unit.
+        int currentSteps = (int) (heightThisLevel / 100);
 
-            startTransition(3);
+        if (currentSteps > scoredSteps) {
+            game.addScore((currentSteps - scoredSteps) * 10);
+            scoredSteps = currentSteps;
+        }
 
-        } else if (game.getLevel() == 3 &&
-                heightThisLevel >= Constants.LEVEL_3_BOSS_HEIGHT) {
+        // Menambah platform baru ketika kamera bergerak naik.
+        extendPlatforms();
 
-            bossZone = true;
+        // Menghapus platform yang sudah tidak dibutuhkan.
+        platforms.removeIf(platform ->
+                !platform.isActive() ||
+                        platform.getY() >
+                                camera.getY() + Constants.HEIGHT + 300
+        );
+
+        // Mengurangi nyawa ketika player jatuh melewati layar.
+        boolean fell = collision.checkFall(
+                player,
+                camera.getY() + Constants.HEIGHT
+        );
+
+        if (fell) {
+
+            if (game.getLives() <= 0) {
+                manager.change(new GameOverState(manager));
+                return;
+            }
+
+            respawnPlayer();
+            return;
         }
 
         if (game.getLives() <= 0) {
             manager.change(new GameOverState(manager));
+            return;
+        }
+
+        // Perpindahan level berdasarkan ketinggian player.
+        if (game.getLevel() == 1 &&
+                heightThisLevel >= levelConfig.getTargetHeight()) {
+
+            startTransition(2);
+
+        } else if (game.getLevel() == 2 &&
+                heightThisLevel >= levelConfig.getTargetHeight()) {
+
+            startTransition(3);
+
+        } else if (game.getLevel() == 3 &&
+                heightThisLevel >= levelConfig.getTargetHeight()) {
+
+            bossZone = true;
         }
     }
 
+    // Membuat platform tambahan di atas platform terakhir.
+    private void extendPlatforms() {
+
+        double upperLimit = camera.getY() - 300;
+
+        while (lastPlatformY > upperLimit) {
+
+            List<Platform> newPlatforms =
+                    generator.generateNext(
+                            levelConfig,
+                            lastPlatformY,
+                            8
+                    );
+
+            platforms.addAll(newPlatforms);
+
+            // Posisi terakhir diperbarui agar tidak mengulang platform.
+            lastPlatformY -=
+                    8 * levelConfig.getVerticalSpacing();
+        }
+    }
+
+    // Menyiapkan pijakan baru setelah player kehilangan nyawa.
+    private void respawnPlayer() {
+
+        double safeY =
+                camera.getY() + Constants.HEIGHT - 100;
+
+        // Menambah platform normal untuk tempat respawn.
+        platforms.add(
+                PlatformFactory.create(
+                        PlatformType.NORMAL,
+                        580,
+                        safeY
+                )
+        );
+
+        player.spawnAt(580, safeY);
+        player.makeInvulnerable(Player.INVULNERABLE_SECONDS);
+        player.bounce();
+    }
+
+    // Mengatur waktu transisi sebelum masuk level selanjutnya.
     private void startTransition(int targetLevel) {
 
         if (transitioning) {
@@ -140,8 +282,7 @@ public final class PlayingState extends GameState {
 
         transitionSeconds = Constants.LEVEL_INTRO_SECONDS;
 
-        left = false;
-        right = false;
+        player.stopMoving();
     }
 
     @Override
@@ -157,40 +298,19 @@ public final class PlayingState extends GameState {
         }
 
         if (k == KeyCode.A || k == KeyCode.LEFT) {
-            left = true;
+            player.setMovingLeft(true);
         }
 
         if (k == KeyCode.D || k == KeyCode.RIGHT) {
-            right = true;
+            player.setMovingRight(true);
         }
 
-        if (k == KeyCode.SPACE) {
-
-            playerWorldY -= 100;
-
-            camera.follow(playerWorldY);
-
-            highestWorldY = Math.min(
-                    highestWorldY,
-                    playerWorldY
-            );
-
-            heightThisLevel = Math.max(
-                    0,
-                    levelStartY - highestWorldY
-            );
-
-            game.setMaxHeight(
-                    game.getMaxHeight() + 100
-            );
-
-            game.addScore(10);
-        }
-
+        // Tombol bantuan untuk menguji nyawa.
         if (k == KeyCode.H) {
             game.loseLife();
         }
 
+        // Tombol pengujian kemenangan sementara.
         if (k == KeyCode.B && bossZone) {
             manager.change(new VictoryState(manager));
         }
@@ -200,11 +320,11 @@ public final class PlayingState extends GameState {
     public void onKeyReleased(KeyCode k) {
 
         if (k == KeyCode.A || k == KeyCode.LEFT) {
-            left = false;
+            player.setMovingLeft(false);
         }
 
         if (k == KeyCode.D || k == KeyCode.RIGHT) {
-            right = false;
+            player.setMovingRight(false);
         }
     }
 
@@ -215,6 +335,7 @@ public final class PlayingState extends GameState {
                 ? nextLevel
                 : game.getLevel();
 
+        // Menentukan warna background sesuai level.
         Color bg = level == 1
                 ? Color.web("#a0d9f2")
                 : level == 2
@@ -224,59 +345,60 @@ public final class PlayingState extends GameState {
         gc.setFill(bg);
 
         gc.fillRect(
-                0, 0,
+                0,
+                0,
                 Constants.WIDTH,
                 Constants.HEIGHT
         );
 
+        // Background parallax sementara tersedia untuk Level 1.
         if (level == 1) {
             level1Background.draw(gc, camera.getY());
         }
 
-        gc.setFill(
-                level == 2
-                        ? Color.web("#7ac1da")
-                        : Color.web("#468a59")
-        );
+        // Menggeser gambar objek sesuai posisi kamera.
+        gc.save();
+        gc.translate(0, -camera.getY());
 
-        for (int i = 0; i < 6; i++) {
+        // Menampilkan seluruh platform yang masih aktif.
+        for (Platform platform : platforms) {
 
-            double platformWorldY =
-                    580 - (i % 3) * 125;
+            if (!platform.isActive()) {
+                continue;
+            }
 
-            double screenY =
-                    camera.worldToScreenY(platformWorldY);
+            // Bentuk sementara jika sprite platform belum tersedia.
+            gc.setFill(Color.web("#468a59"));
 
             gc.fillRoundRect(
-                    140 + i * 185,
-                    screenY,
-                    Constants.PLATFORM_WIDTH,
-                    Constants.PLATFORM_HEIGHT,
-                    15, 15
+                    platform.getX(),
+                    platform.getY(),
+                    platform.getWidth(),
+                    platform.getHeight(),
+                    12,
+                    12
             );
+
+            // Menggambar aset platform jika gambarnya tersedia.
+            platform.draw(gc);
         }
 
-        double playerScreenY =
-                camera.worldToScreenY(playerWorldY);
+        // Player digambar sesuai posisi di dunia permainan.
+        player.draw(gc);
 
-        gc.setFill(Color.web("#4778c8"));
+        gc.restore();
 
-        gc.fillRoundRect(
-                playerX,
-                playerScreenY,
-                Constants.PLAYER_SIZE,
-                Constants.PLAYER_SIZE,
-                18, 18
-        );
-
+        // HUD tetap berada di posisi layar.
         hud.draw(gc);
 
+        // Menampilkan layar transisi level.
         if (transitioning) {
 
             gc.setFill(Color.rgb(7, 20, 43, 0.78));
 
             gc.fillRect(
-                    0, 0,
+                    0,
+                    0,
                     Constants.WIDTH,
                     Constants.HEIGHT
             );
@@ -286,7 +408,8 @@ public final class PlayingState extends GameState {
 
             gc.fillText(
                     "LEVEL " + nextLevel,
-                    490, 310
+                    490,
+                    310
             );
 
             gc.setFont(Font.font("Poppins", 43));
@@ -303,7 +426,8 @@ public final class PlayingState extends GameState {
 
             gc.fillText(
                     "GET READY!",
-                    555, 445
+                    555,
+                    445
             );
         }
     }
